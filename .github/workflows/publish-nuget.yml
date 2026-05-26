@@ -1,0 +1,37 @@
+name: Publish to NuGet
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+      - name: Generate C# bindings from Rust
+        run: cargo build --release
+        working-directory: ./src/xie_sender_generator
+      - name: Format generated code
+        run: dotnet format
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build -c Release --no-restore
+      - name: Pack
+        run: dotnet pack -c Release --no-build -o artifacts/
+      - name: Publish to NuGet
+        run: find . -type f -name "*.nupkg" -print0 | xargs -0 -I pkg dotnet nuget push pkg -k $NUGET_API_KEY -s "https://api.nuget.org/v3/index.json" --skip-duplicate
+        working-directory: ./artifacts
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
