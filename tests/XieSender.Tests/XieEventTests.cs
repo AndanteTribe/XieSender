@@ -61,5 +61,3 @@ public class XieEventTests
         Assert.NotEqual(e1, e2);
     }
 }
-
-

@@ -136,9 +136,9 @@ public sealed class XieClient : IDisposable
                     wasConnected = true;
                     writer.TryWrite(new ControllerConnected(_options.UserIndex));
 
-                    baseTick  = Stopwatch.GetTimestamp();
+                    baseTick = Stopwatch.GetTimestamp();
                     loopCount = 0;
-                    sampleId  = 0;
+                    sampleId = 0;
 
                     SendPacket(socket, sendBuffer, ref state.Gamepad,
                                ref sampleId, ref heartbeat, writer);

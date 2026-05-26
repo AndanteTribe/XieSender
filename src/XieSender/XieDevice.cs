@@ -7,8 +7,8 @@ public static class XieDevice
 {
     private const uint ErrorSuccess = 0;
 
-    /// <summary>最初に見つかった接続済みデバイスのインデックスを返す。見つからなければ null。</summary>
-    public static unsafe int? FindFirst()
+    /// <summary>最初に見つかった接続済みデバイスのインデックスを返す。見つからなければ -1。</summary>
+    public static unsafe int FindFirst()
     {
         for (uint i = 0; i < 4; i++)
         {
@@ -18,7 +18,7 @@ public static class XieDevice
                 return (int)i;
             }
         }
-        return null;
+        return -1;
     }
 
     /// <summary>接続済みデバイスのインデックス一覧を返す。</summary>

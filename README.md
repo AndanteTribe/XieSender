@@ -45,7 +45,13 @@ Install-Package AndanteTribe.XieSender
 ```csharp
 using XieSender;
 
-int index = XieDevice.FindFirst() ?? throw new InvalidOperationException("デバイスなし");
+int index = XieDevice.FindFirst();
+if (index < 0)
+{
+    Console.WriteLine("コントローラーが見つかりません。");
+    return;
+}
+
 using var client = new XieClient("192.168.4.100", 5000, new XieClientOptions { UserIndex = index });
 
 await foreach (var ev in client.RunStreamAsync())
@@ -67,13 +73,13 @@ await foreach (var ev in client.RunStreamAsync())
 
 #### `XieDevice.FindFirst()`
 
-最初に見つかったコントローラーのインデックスを返します。見つからない場合は `null` を返します。
+最初に見つかったコントローラーのインデックスを返します。見つからない場合は `-1` を返します。
 
 ```csharp
-int? index = XieDevice.FindFirst();
-if (index.HasValue)
+int index = XieDevice.FindFirst();
+if (index >= 0)
 {
-    Console.WriteLine($"デバイス検出: Index {index.Value}");
+    Console.WriteLine($"デバイス検出: Index {index}");
 }
 ```
 

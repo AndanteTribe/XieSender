@@ -48,5 +48,3 @@ public class XieClientOptionsTests
         Assert.Equal(1, modified.UserIndex);
     }
 }
-
-

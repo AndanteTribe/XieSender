@@ -3,13 +3,13 @@ namespace XieSender.Tests;
 public class XieDeviceTests
 {
     [Fact]
-    public void FindFirstWhenNoDevicesShouldReturnNull()
+    public void FindFirstWhenNoDevicesShouldReturnMinusOne()
     {
         // GitHub Actions の Windows ランナーにはコントローラーが接続されていない想定
         var result = XieDevice.FindFirst();
 
-        // デバイスがない場合は null、ある場合は 0-3
-        Assert.True(result == null || (result >= 0 && result <= 3));
+        // デバイスがない場合は -1、ある場合は 0-3
+        Assert.True(result == -1 || (result >= 0 && result <= 3));
     }
 
     [Fact]
@@ -39,14 +39,14 @@ public class XieDeviceTests
         var first = XieDevice.FindFirst();
         var all = XieDevice.FindAll();
 
-        if (first.HasValue)
+        if (first >= 0)
         {
             // FindFirst が値を返すなら、FindAll にも含まれているはず
-            Assert.Contains(first.Value, all);
+            Assert.Contains(first, all);
         }
         else
         {
-            // FindFirst が null なら、FindAll は空のはず
+            // FindFirst が -1 なら、FindAll は空のはず
             Assert.Empty(all);
         }
     }
@@ -70,6 +70,3 @@ public class XieDeviceTests
         Assert.Equal(result1.Count, result2.Count);
     }
 }
-
-
-

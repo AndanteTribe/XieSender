@@ -85,7 +85,8 @@ public class XieClientTests
             await foreach (var ev in client.RunStreamAsync())
             {
                 count++;
-                if (count > 100) break; // 無限ループ防止
+                if (count > 100)
+                    break; // 無限ループ防止
             }
         });
 
@@ -160,6 +161,3 @@ public class XieClientTests
         Assert.NotNull(client);
     }
 }
-
-
-
