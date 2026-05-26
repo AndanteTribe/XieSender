@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Channels;
+using System.Threading.Tasks;
 
 namespace XieSender;
 
@@ -180,6 +182,7 @@ public sealed class XieClient : IDisposable
         }
     }
 
+    [ExcludeFromCodeCoverage]
     private unsafe void SendPacket(
         Socket socket,
         Span<byte> buffer,
@@ -248,7 +251,10 @@ public sealed class XieClient : IDisposable
     /// </summary>
     public void Dispose()
     {
-        _disposeCts.Cancel();
-        _disposeCts.Dispose();
+        if (!_disposeCts.IsCancellationRequested)
+        {
+            _disposeCts.Cancel();
+            _disposeCts.Dispose();
+        }
     }
 }
