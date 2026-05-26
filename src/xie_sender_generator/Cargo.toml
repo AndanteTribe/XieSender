@@ -1,0 +1,10 @@
+[package]
+name = "xie_sender_generator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[build-dependencies]
+csbindgen = "1"
+
