@@ -12,8 +12,8 @@
         <!-- NuGet Packaging -->
         <PackageId>AndanteTribe.XieSender</PackageId>
         <PackageVersion>$(Version)</PackageVersion>
-        <Authors>AndanteTribe</Authors>
-        <Copyright>© AndanteTribe</Copyright>
+        <Authors>Oryosan59, AndanteTribe</Authors>
+        <Copyright>© Oryosan59, AndanteTribe</Copyright>
         <Description>Lightweight and optimized sender-only implementation extracted from XInputEdge.</Description>
         <PackageProjectUrl>https://github.com/AndanteTribe/XieSender</PackageProjectUrl>
         <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
