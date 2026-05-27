@@ -486,7 +486,7 @@ $RECYCLE.BIN/
 
 # Added by cargo
 
-/target
+target/
 
 # Rust
 **/*.rs.bk
