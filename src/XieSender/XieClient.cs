@@ -22,13 +22,13 @@ public sealed class XieClient : IDisposable
     private readonly IPEndPoint _endpoint;
     private readonly XieClientOptions _options;
     private readonly long _intervalTicks;
+    private readonly long _startTick;
     private readonly CancellationTokenSource _disposeCts = new();
+    private int _disposeState;
+    private int _runStreamStarted;
 
     // WouldBlock によるドロップ数（SendLoop スレッドとの共有）
     private long _droppedPackets;
-
-    // タイムスタンプの起点（プロセス起動時刻）
-    private static readonly long s_startTick = Stopwatch.GetTimestamp();
 
     // -----------------------------------------------------------------------
     // 構築
@@ -46,6 +46,7 @@ public sealed class XieClient : IDisposable
         _endpoint = endpoint;
         _options = options ?? new XieClientOptions();
         _intervalTicks = Stopwatch.Frequency / _options.TargetHz;
+        _startTick = Stopwatch.GetTimestamp();
     }
 
     // -----------------------------------------------------------------------
@@ -60,6 +61,12 @@ public sealed class XieClient : IDisposable
     /// </summary>
     public async IAsyncEnumerable<XieEvent> RunStreamAsync()
     {
+        if (Interlocked.CompareExchange(ref _runStreamStarted, 1, 0) != 0)
+            throw new InvalidOperationException("RunStreamAsync can only be called once.");
+
+        if (Volatile.Read(ref _disposeState) != 0)
+            throw new ObjectDisposedException(nameof(XieClient));
+
         var ct = _disposeCts.Token;
 
         // ソケット生成
@@ -235,9 +242,9 @@ public sealed class XieClient : IDisposable
         }
     }
 
-    private static uint GetMonotonicUs()
+    private uint GetMonotonicUs()
     {
-        long elapsed = Stopwatch.GetTimestamp() - s_startTick;
+        long elapsed = Stopwatch.GetTimestamp() - _startTick;
         return (uint)((elapsed * 1_000_000) / Stopwatch.Frequency);
     }
 
@@ -251,10 +258,10 @@ public sealed class XieClient : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (!_disposeCts.IsCancellationRequested)
-        {
-            _disposeCts.Cancel();
-            _disposeCts.Dispose();
-        }
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
+            return;
+
+        _disposeCts.Cancel();
+        _disposeCts.Dispose();
     }
 }

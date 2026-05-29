@@ -1,4 +1,5 @@
 using System.Net;
+using System.Threading;
 
 namespace XieSender.Tests;
 
@@ -66,6 +67,25 @@ public class XieClientTests
     }
 
     [Fact]
+    public async Task DisposeCalledConcurrentlyShouldNotThrow()
+    {
+        var client = new XieClient("127.0.0.1", 5000);
+        using var gate = new ManualResetEventSlim(false);
+
+        var tasks = Enumerable.Range(0, 8)
+            .Select(_ => Task.Run(() =>
+            {
+                gate.Wait();
+                client.Dispose();
+            }))
+            .ToArray();
+
+        gate.Set();
+
+        await Task.WhenAll(tasks);
+    }
+
+    [Fact]
     public void ConstructorWithInvalidHostShouldThrow()
     {
         Assert.Throws<FormatException>(() =>
@@ -96,6 +116,26 @@ public class XieClientTests
 
         // Dispose により RunStreamAsync が完了するはず
         await task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task RunStreamAsyncCalledTwiceShouldThrow()
+    {
+        using var client = new XieClient("127.0.0.1", 5000);
+        await using var firstEnumerator = client.RunStreamAsync().GetAsyncEnumerator();
+
+        var firstMoveNextTask = firstEnumerator.MoveNextAsync().AsTask();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await using var secondEnumerator = client.RunStreamAsync().GetAsyncEnumerator();
+            await secondEnumerator.MoveNextAsync();
+        });
+
+        Assert.Equal("RunStreamAsync can only be called once.", exception.Message);
+
+        client.Dispose();
+        await firstMoveNextTask.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
