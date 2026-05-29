@@ -23,7 +23,8 @@ public sealed class XieClient : IDisposable
     private readonly XieClientOptions _options;
     private readonly long _intervalTicks;
     private readonly long _startTick;
-    private CancellationTokenSource? _disposeCts = new();
+    private readonly CancellationTokenSource _disposeCts = new();
+    private int _disposeState;
     private int _runStreamStarted;
 
     // WouldBlock によるドロップ数（SendLoop スレッドとの共有）
@@ -63,9 +64,10 @@ public sealed class XieClient : IDisposable
         if (Interlocked.CompareExchange(ref _runStreamStarted, 1, 0) != 0)
             throw new InvalidOperationException("RunStreamAsync can only be called once.");
 
-        var disposeCts = Volatile.Read(ref _disposeCts)
-            ?? throw new ObjectDisposedException(nameof(XieClient));
-        var ct = disposeCts.Token;
+        if (Volatile.Read(ref _disposeState) != 0)
+            throw new ObjectDisposedException(nameof(XieClient));
+
+        var ct = _disposeCts.Token;
 
         // ソケット生成
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
@@ -256,11 +258,10 @@ public sealed class XieClient : IDisposable
     /// </summary>
     public void Dispose()
     {
-        var disposeCts = Interlocked.Exchange(ref _disposeCts, null);
-        if (disposeCts is null)
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
             return;
 
-        disposeCts.Cancel();
-        disposeCts.Dispose();
+        _disposeCts.Cancel();
+        _disposeCts.Dispose();
     }
 }
