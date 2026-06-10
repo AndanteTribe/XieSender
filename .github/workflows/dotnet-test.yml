@@ -21,9 +21,11 @@ jobs:
   test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      # ghasec-ignore: unpinned-action
+      - uses: AndanteTribe/Actions/actions/checkout@main # zizmor: ignore[unpinned-uses] repository-local action reference is intentionally tracked on @main
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        # ghasec-ignore: unpinned-action
+        uses: AndanteTribe/Actions/actions/setup-dotnet@main # zizmor: ignore[unpinned-uses] repository-local action reference is intentionally tracked on @main
         with:
           dotnet-version: 8.0.x
       - name: Generate C# bindings from Rust
@@ -50,7 +52,8 @@ jobs:
           dotnet tool install -g dotnet-reportgenerator-globaltool
           reportgenerator -reports:"coverage.cobertura.xml" -targetdir:"report" -reporttypes:"Html;MarkdownSummary"
           Get-Content report/Summary.md | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
-      - uses: actions/upload-artifact@v7
+      # ghasec-ignore: unpinned-action
+      - uses: AndanteTribe/Actions/actions/upload-artifact@main  # zizmor: ignore[unpinned-uses] repository-local action reference is intentionally tracked on @main
         with:
           name: coverage-report
           path: report/
