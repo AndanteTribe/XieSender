@@ -141,7 +141,7 @@ public sealed class XieClient : IDisposable
         // CPU コアアフィニティの適用（オプション）
         if (_options.CpuCoreAffinity.HasValue)
         {
-            var mask = (nuint)(1 << _options.CpuCoreAffinity.Value);
+            var mask = (nuint)1 << _options.CpuCoreAffinity.Value;
             Kernel32.SetThreadAffinityMask(Kernel32.GetCurrentThread(), mask);
         }
 
@@ -164,7 +164,7 @@ public sealed class XieClient : IDisposable
                 {
                     // 未接続: 低頻度ポーリングで待機
                     XINPUT_STATE state;
-                    if (XInput.XInputGetState((uint)_options.UserIndex, &state) != 0)
+                    if (XInput.XInputGetState(_options.UserIndex, &state) != 0)
                     {
                         if (ct.WaitHandle.WaitOne(500))
                         {
@@ -213,7 +213,7 @@ public sealed class XieClient : IDisposable
                     }
 
                     XINPUT_STATE state;
-                    if (XInput.XInputGetState((uint)_options.UserIndex, &state) != 0)
+                    if (XInput.XInputGetState(_options.UserIndex, &state) != 0)
                     {
                         wasConnected = false;
                         writer.TryWrite(new ControllerDisconnected(_options.UserIndex));

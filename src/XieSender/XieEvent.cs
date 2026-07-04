@@ -7,11 +7,11 @@ public abstract record XieEvent;
 
 /// <summary>コントローラーが接続された。</summary>
 /// <param name="Index">XInput ユーザーインデックス (0–3)。</param>
-public sealed record ControllerConnected(int Index) : XieEvent;
+public sealed record ControllerConnected(uint Index) : XieEvent;
 
 /// <summary>コントローラーが切断された。</summary>
 /// <param name="Index">XInput ユーザーインデックス (0–3)。</param>
-public sealed record ControllerDisconnected(int Index) : XieEvent;
+public sealed record ControllerDisconnected(uint Index) : XieEvent;
 
 /// <summary>送信中に回復不能なエラーが発生した。</summary>
 /// <param name="Exception">発生した例外。</param>

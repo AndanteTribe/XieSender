@@ -7,7 +7,7 @@ public class XieEventTests
     {
         var ev = new ControllerConnected(2);
 
-        Assert.Equal(2, ev.Index);
+        Assert.Equal(2u, ev.Index);
         Assert.IsAssignableFrom<XieEvent>(ev);
     }
 
@@ -16,7 +16,7 @@ public class XieEventTests
     {
         var ev = new ControllerDisconnected(1);
 
-        Assert.Equal(1, ev.Index);
+        Assert.Equal(1u, ev.Index);
         Assert.IsAssignableFrom<XieEvent>(ev);
     }
 
