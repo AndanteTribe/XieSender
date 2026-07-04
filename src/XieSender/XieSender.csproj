@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <OutputType>Library</OutputType>
-        <Version>0.2.0</Version>
+        <Version>0.3.0</Version>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
         <!-- NuGet Packaging -->
