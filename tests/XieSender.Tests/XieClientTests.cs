@@ -29,7 +29,7 @@ public class XieClientTests
         {
             UserIndex = 1,
             TargetHz = 500,
-            CpuCoreAffinity = 2
+            CpuCoreAffinity = 0
         };
 
         using var client = new XieClient("127.0.0.1", 5000, options);
@@ -211,7 +211,7 @@ public class XieClientTests
     [InlineData(3)]
     public void ConstructorWithValidUserIndexShouldCreate(int userIndex)
     {
-        var options = new XieClientOptions { UserIndex = userIndex };
+        var options = new XieClientOptions { UserIndex = (uint)userIndex };
         using var client = new XieClient("127.0.0.1", 5000, options);
 
         Assert.NotNull(client);

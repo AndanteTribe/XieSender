@@ -52,7 +52,7 @@ if (index < 0)
     return;
 }
 
-using var client = new XieClient("192.168.4.100", 5000, new XieClientOptions { UserIndex = index });
+using var client = new XieClient("192.168.4.100", 5000, new XieClientOptions { UserIndex = (uint)index });
 
 await foreach (var ev in client.RunStreamAsync())
 {
@@ -104,7 +104,7 @@ foreach (var index in devices)
 ```csharp
 public sealed record XieClientOptions
 {
-    public int UserIndex { get; init; } = 0;           // XInput インデックス (0-3)
+    public uint UserIndex { get; init; } = 0;          // XInput インデックス (0-3)
     public int TargetHz { get; init; } = 1000;         // 送信レート (Hz)
     public int? CpuCoreAffinity { get; init; } = null; // CPU コア固定 (null で未固定)
 }
@@ -169,7 +169,7 @@ await foreach (var ev in client.RunStreamAsync())
 #### `ControllerConnected`
 
 ```csharp
-public sealed record ControllerConnected(int Index) : XieEvent;
+public sealed record ControllerConnected(uint Index) : XieEvent;
 ```
 
 コントローラーが接続されたときに発火します。
@@ -177,7 +177,7 @@ public sealed record ControllerConnected(int Index) : XieEvent;
 #### `ControllerDisconnected`
 
 ```csharp
-public sealed record ControllerDisconnected(int Index) : XieEvent;
+public sealed record ControllerDisconnected(uint Index) : XieEvent;
 ```
 
 コントローラーが切断されたときに発火します。
