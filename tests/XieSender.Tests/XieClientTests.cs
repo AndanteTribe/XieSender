@@ -119,6 +119,46 @@ public class XieClientTests
     }
 
     [Fact]
+    public async Task RunStreamAsyncWithCancellationTokenShouldCancel()
+    {
+        using var client = new XieClient("127.0.0.1", 5000);
+        using var cts = new CancellationTokenSource();
+
+        var task = Task.Run(async () =>
+        {
+            await foreach (var ev in client.RunStreamAsync(cts.Token))
+            {
+            }
+        });
+
+        await Task.Delay(100);
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task RunStreamAsyncWithEnumeratorCancellationShouldCancel()
+    {
+        using var client = new XieClient("127.0.0.1", 5000);
+        using var cts = new CancellationTokenSource();
+
+        var task = Task.Run(async () =>
+        {
+            await foreach (var ev in client.RunStreamAsync().WithCancellation(cts.Token))
+            {
+            }
+        });
+
+        await Task.Delay(100);
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
     public async Task RunStreamAsyncCalledTwiceShouldThrow()
     {
         using var client = new XieClient("127.0.0.1", 5000);

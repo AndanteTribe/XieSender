@@ -4,9 +4,9 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 
 namespace XieSender;
 
@@ -23,8 +23,8 @@ public sealed class XieClient : IDisposable
     private readonly XieClientOptions _options;
     private readonly long _intervalTicks;
     private readonly long _startTick;
+    private readonly object _disposeLock = new();
     private readonly CancellationTokenSource _disposeCts = new();
-    private int _disposeState;
     private int _runStreamStarted;
 
     // WouldBlock によるドロップ数（SendLoop スレッドとの共有）
@@ -34,13 +34,17 @@ public sealed class XieClient : IDisposable
     // 構築
     // -----------------------------------------------------------------------
 
-    /// <summary>ホスト名と UDP ポートを指定してクライアントを生成する。</summary>
+    /// <summary>
+    /// ホスト名と UDP ポートを指定してクライアントを生成する。
+    /// </summary>
     public XieClient(string host, int port, XieClientOptions? options = null)
         : this(new IPEndPoint(IPAddress.Parse(host), port), options)
     {
     }
 
-    /// <summary>送信先エンドポイントを直接指定してクライアントを生成する。</summary>
+    /// <summary>
+    /// 送信先エンドポイントを直接指定してクライアントを生成する。
+    /// </summary>
     public XieClient(IPEndPoint endpoint, XieClientOptions? options = null)
     {
         _endpoint = endpoint;
@@ -59,47 +63,73 @@ public sealed class XieClient : IDisposable
     /// <see cref="Dispose"/> を呼ぶと送信を停止し、列挙が完了する。
     /// </para>
     /// </summary>
-    public async IAsyncEnumerable<XieEvent> RunStreamAsync()
+    /// <param name="cancellationToken">列挙と送信ループをキャンセルするトークン。</param>
+    public async IAsyncEnumerable<XieEvent> RunStreamAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (Interlocked.CompareExchange(ref _runStreamStarted, 1, 0) != 0)
+        {
             throw new InvalidOperationException("RunStreamAsync can only be called once.");
-
-        if (Volatile.Read(ref _disposeState) != 0)
-            throw new ObjectDisposedException(nameof(XieClient));
-
-        var ct = _disposeCts.Token;
-
-        // ソケット生成
-        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        socket.Connect(_endpoint);
-        socket.Blocking = false;
-
-        // SendLoop（専用スレッド）→ RunStreamAsync（呼び出し元）へのイベント橋渡し
-        // イベントは稀なので容量 64 で十分。溢れた場合は古いものを破棄する
-        var channel = Channel.CreateBounded<XieEvent>(new BoundedChannelOptions(64)
-        {
-            SingleWriter = true,
-            SingleReader = true,
-            FullMode = BoundedChannelFullMode.DropOldest,
-        });
-
-        var thread = new Thread(() => SendLoop(socket, channel.Writer, ct))
-        {
-            IsBackground = true,
-            Priority = ThreadPriority.Highest,
-            Name = $"XieSendLoop_{_options.UserIndex}",
-        };
-        thread.Start();
-
-        // SendLoop が writer.Complete() を呼ぶまで読み続ける
-        await foreach (var ev in channel.Reader.ReadAllAsync(CancellationToken.None))
-        {
-            yield return ev;
         }
 
-        // スレッドの終了を待ってからソケットを閉じる
-        thread.Join();
-        socket.Close();
+        CancellationTokenSource runCts;
+        lock (_disposeLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposeCts.IsCancellationRequested, this);
+            runCts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token, cancellationToken);
+        }
+
+        Socket? socket = null;
+        Thread? thread = null;
+        var threadStarted = false;
+
+        try
+        {
+            // ソケット生成
+            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.Connect(_endpoint);
+            socket.Blocking = false;
+
+            // SendLoop（専用スレッド）→ RunStreamAsync（呼び出し元）へのイベント橋渡し
+            // イベントは稀なので容量 64 で十分。溢れた場合は古いものを破棄する。
+            var channel = Channel.CreateBounded<XieEvent>(new BoundedChannelOptions(64)
+            {
+                SingleWriter = true,
+                SingleReader = true,
+                FullMode = BoundedChannelFullMode.DropOldest,
+            });
+
+            var loopSocket = socket;
+            var ct = runCts.Token;
+            thread = new Thread(() => SendLoop(loopSocket, channel.Writer, ct))
+            {
+                IsBackground = true,
+                Priority = ThreadPriority.Highest,
+                Name = $"XieSendLoop_{_options.UserIndex}",
+            };
+            thread.Start();
+            threadStarted = true;
+
+            // Dispose は channel 完了で自然終了し、外部キャンセルは OperationCanceledException で抜ける。
+            await foreach (var ev in channel.Reader.ReadAllAsync(cancellationToken))
+            {
+                yield return ev;
+            }
+        }
+        finally
+        {
+            // 列挙キャンセルや途中 break でも送信ループとソケットを確実に片付ける。
+            runCts.Cancel();
+
+            if (threadStarted)
+            {
+                thread!.Join();
+            }
+
+            socket?.Close();
+            runCts.Dispose();
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -117,12 +147,12 @@ public sealed class XieClient : IDisposable
 
         long baseTick = 0;
         long loopCount = 0;
-        bool wasConnected = false;
+        var wasConnected = false;
         ushort sampleId = 0;
         byte heartbeat = 0;
 
         // インターバルの半分より余裕があれば Sleep(0) でCPUを手放す
-        long yieldThreshold = _intervalTicks / 2;
+        var yieldThreshold = _intervalTicks / 2;
 
         Span<byte> sendBuffer = stackalloc byte[XieProtocol.XIE_PACKET_SIZE];
 
@@ -136,7 +166,11 @@ public sealed class XieClient : IDisposable
                     XINPUT_STATE state;
                     if (XInput.XInputGetState((uint)_options.UserIndex, &state) != 0)
                     {
-                        Thread.Sleep(500);
+                        if (ct.WaitHandle.WaitOne(500))
+                        {
+                            return;
+                        }
+
                         continue;
                     }
 
@@ -147,25 +181,30 @@ public sealed class XieClient : IDisposable
                     loopCount = 0;
                     sampleId = 0;
 
-                    SendPacket(socket, sendBuffer, ref state.Gamepad,
-                               ref sampleId, ref heartbeat, writer);
+                    SendPacket(socket, sendBuffer, ref state.Gamepad, ref sampleId, ref heartbeat, writer);
                     loopCount++;
                 }
                 else
                 {
                     // 接続中: ハイブリッドウェイトで指定レートを維持
-                    long target = baseTick + loopCount * _intervalTicks;
+                    var target = baseTick + loopCount * _intervalTicks;
 
                     while (true)
                     {
-                        long now = Stopwatch.GetTimestamp();
+                        var now = Stopwatch.GetTimestamp();
                         if (now >= target)
+                        {
                             break;
+                        }
 
                         if (target - now > yieldThreshold)
-                            Thread.Sleep(0);    // 余裕があれば OS に譲る
+                        {
+                            Thread.Sleep(0);
+                        }
                         else
-                            Thread.SpinWait(10); // 終端の微調整はスピン
+                        {
+                            Thread.SpinWait(10);
+                        }
                     }
 
                     XINPUT_STATE state;
@@ -176,8 +215,7 @@ public sealed class XieClient : IDisposable
                         continue;
                     }
 
-                    SendPacket(socket, sendBuffer, ref state.Gamepad,
-                               ref sampleId, ref heartbeat, writer);
+                    SendPacket(socket, sendBuffer, ref state.Gamepad, ref sampleId, ref heartbeat, writer);
                     loopCount++;
                 }
             }
@@ -244,7 +282,7 @@ public sealed class XieClient : IDisposable
 
     private uint GetMonotonicUs()
     {
-        long elapsed = Stopwatch.GetTimestamp() - _startTick;
+        var elapsed = Stopwatch.GetTimestamp() - _startTick;
         return (uint)((elapsed * 1_000_000) / Stopwatch.Frequency);
     }
 
@@ -258,10 +296,15 @@ public sealed class XieClient : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
-            return;
+        lock (_disposeLock)
+        {
+            if (_disposeCts.IsCancellationRequested)
+            {
+                return;
+            }
 
-        _disposeCts.Cancel();
-        _disposeCts.Dispose();
+            _disposeCts.Cancel();
+            _disposeCts.Dispose();
+        }
     }
 }
