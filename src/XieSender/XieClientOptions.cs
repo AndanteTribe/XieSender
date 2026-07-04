@@ -7,7 +7,7 @@ namespace XieSender;
 public sealed record XieClientOptions
 {
     private readonly uint _userIndex;
-    private readonly int _targetHz = Math.Min(1000, (int)Stopwatch.Frequency);
+    private readonly int _targetHz = (int)Math.Min(1000L, Stopwatch.Frequency);
     private readonly int? _cpuCoreAffinity;
 
     /// <summary>XInput ユーザーインデックス（0–3）。デフォルト 0。</summary>
