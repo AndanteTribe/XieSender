@@ -191,6 +191,11 @@ public sealed class XieClient : IDisposable
 
                     while (true)
                     {
+                        if (ct.IsCancellationRequested)
+                        {
+                            return;
+                        }
+
                         var now = Stopwatch.GetTimestamp();
                         if (now >= target)
                         {
